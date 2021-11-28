@@ -1,12 +1,14 @@
+const jwt = require('jsonwebtoken');
 const Cards = require('../models/cards');
+const NotFoundError = require('../errors/not-found-error');
 
-module.exports.getCards = (req, res) => {
+module.exports.getCards = (req, res, next) => {
   Cards.find({})
     .then((cards) => res.send({ data: cards }))
-    .catch(() => res.status(500).send({ message: 'Произошла ошибка.' }));
+    .catch(next);
 };
 
-module.exports.createCard = (req, res) => {
+module.exports.createCard = (req, res, next) => {
   const { name, link } = req.body;
   Cards.create({ name, link, owner: req.user._id })
     .then((card) => res.send({ data: card }))
@@ -14,21 +16,23 @@ module.exports.createCard = (req, res) => {
       if (err.name === 'ValidationError') {
         return res.status(400).send({ message: 'Переданы некорректные данные при создании карточки.' });
       }
-      return res.status(500).send({ message: 'Произошла ошибка.' });
+      return next(err);
     });
 };
 
-module.exports.deleteCard = (req, res) => {
+module.exports.deleteCard = (req, res, next) => {
   const { cardId } = req.params;
 
-  Cards.findByIdAndRemove(cardId)
+  const decoded = jwt.verify(req.cookies.jwt, 'some-secret-key');
+
+  Cards.findById(cardId)
     .then((card) => {
-      if (!card) {
-        const error = new Error('Карточка с указанным _id не найдена.');
-        error.statusCode = 404;
-        throw error;
+      if (card && decoded._id === card.owner) {
+        card.remove();
+        res.send({ data: card });
+        return;
       }
-      res.send({ data: card });
+      throw new NotFoundError('Карточка с указанным _id не найдена.');
     })
     .catch((err) => {
       if (err.name === 'CastError') {
@@ -37,20 +41,18 @@ module.exports.deleteCard = (req, res) => {
       if (err.name === 'Error') {
         return res.status(404).send({ message: 'Карточка с указанным _id не найдена.' });
       }
-      return res.status(500).send({ message: 'Произошла ошибка.' });
+      return next(err);
     });
 };
 
-module.exports.likeCard = (req, res) => {
+module.exports.likeCard = (req, res, next) => {
   Cards.findByIdAndUpdate(
     req.params.cardId,
     { $addToSet: { likes: req.user._id } },
     { new: true },
   )
     .orFail(() => {
-      const error = new Error('Нет карточки/пользователя по заданному id');
-      error.statusCode = 404;
-      throw error;
+      throw new NotFoundError('Нет карточки/пользователя по заданному id');
     })
     .then((card) => res.send({ data: card }))
     .catch((err) => {
@@ -63,20 +65,18 @@ module.exports.likeCard = (req, res) => {
       if (err.name === 'Error') {
         return res.status(404).send({ message: 'Нет карточки по заданному id' });
       }
-      return res.status(500).send({ message: 'Произошла ошибка.' });
+      return next(err);
     });
 };
 
-module.exports.dislikeCard = (req, res) => {
+module.exports.dislikeCard = (req, res, next) => {
   Cards.findByIdAndUpdate(
     req.params.cardId,
     { $pull: { likes: req.user._id } },
     { new: true },
   )
     .orFail(() => {
-      const error = new Error('Нет карточки/пользователя по заданному id');
-      error.statusCode = 404;
-      throw error;
+      throw new NotFoundError('Нет карточки/пользователя по заданному id');
     })
     .then((card) => res.send({ data: card }))
     .catch((err) => {
@@ -89,6 +89,6 @@ module.exports.dislikeCard = (req, res) => {
       if (err.name === 'Error') {
         return res.status(404).send({ message: 'Нет карточки по заданному id' });
       }
-      return res.status(500).send({ message: 'Произошла ошибка.' });
+      return next(err);
     });
 };
