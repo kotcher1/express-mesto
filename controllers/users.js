@@ -32,9 +32,6 @@ module.exports.getUser = (req, res, next) => {
       if (err.name === 'CastError') {
         return next(new BadRequestError('Пользователь по указанному id не найден'));
       }
-      if (err.name === 'Error') {
-        return next(new NotFoundError('Пользователь по указанному id не найден'));
-      }
       return next(err);
     });
 };
@@ -86,9 +83,6 @@ module.exports.updateUserInfo = (req, res, next) => {
       if (err.name === 'CastError') {
         return next(new BadRequestError('Пользователь по указанному id не найден'));
       }
-      if (err.name === 'Error') {
-        return next(new NotFoundError('Пользователь по указанному id не найден'));
-      }
       return next(err);
     });
 };
@@ -110,9 +104,6 @@ module.exports.updateUserAvatar = (req, res, next) => {
       }
       if (err.name === 'CastError') {
         return next(new BadRequestError('Пользователь по указанному id не найден'));
-      }
-      if (err.name === 'Error') {
-        return next(new NotFoundError('Пользователь по указанному id не найден'));
       }
       return next(err);
     });
