@@ -2,6 +2,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Users = require('../models/users');
 const NotFoundError = require('../errors/not-found-error');
+const BadRequestError = require('../errors/not-found-error');
+const ConflictError = require('../errors/conflict-error');
 
 module.exports.getUsers = (req, res, next) => {
   Users.find({})
@@ -28,10 +30,10 @@ module.exports.getUser = (req, res, next) => {
     .then((user) => res.send({ data: user }))
     .catch((err) => {
       if (err.name === 'CastError') {
-        return res.status(400).send({ message: 'Пользователь по указанному id не найден' });
+        return next(new BadRequestError('Пользователь по указанному id не найден'));
       }
       if (err.name === 'Error') {
-        return res.status(404).send({ message: 'Нет пользователя по заданному id.' });
+        return next(new NotFoundError('Пользователь по указанному id не найден'));
       }
       return next(err);
     });
@@ -50,10 +52,17 @@ module.exports.createUser = (req, res, next) => {
     .then((hash) => Users.create({
       name, about, avatar, email, password: hash,
     }))
-    .then((user) => res.send({ data: user }))
+    .then(() => res.send({
+      data: {
+        name, about, avatar, email,
+      },
+    }))
     .catch((err) => {
+      if (err.code === 11000) {
+        return next(new ConflictError('Пользователь с данным email уже существует'));
+      }
       if (err.name === 'ValidationError') {
-        return res.status(400).send({ message: 'Произошла ошибка валидации' });
+        return next(new BadRequestError('Произошла ошибка валидации'));
       }
       return next(err);
     });
@@ -72,13 +81,13 @@ module.exports.updateUserInfo = (req, res, next) => {
     .then((user) => res.send({ data: user }))
     .catch((err) => {
       if (err.name === 'ValidationError') {
-        return res.status(400).send({ message: 'Переданы некорректные данные при обновлении профиля.' });
+        return next(new BadRequestError('Переданы некорректные данные при обновлении профиля.'));
       }
       if (err.name === 'CastError') {
-        return res.status(400).send({ message: 'Пользователь по указанному id не найден' });
+        return next(new BadRequestError('Пользователь по указанному id не найден'));
       }
       if (err.name === 'Error') {
-        return res.status(404).send({ message: 'Нет пользователя по заданному id.' });
+        return next(new NotFoundError('Пользователь по указанному id не найден'));
       }
       return next(err);
     });
@@ -97,13 +106,13 @@ module.exports.updateUserAvatar = (req, res, next) => {
     .then((user) => res.send({ data: user }))
     .catch((err) => {
       if (err.name === 'ValidationError') {
-        return res.status(400).send({ message: 'Переданы некорректные данные при обновлении аватара.' });
+        return next(new BadRequestError('Переданы некорректные данные при обновлении аватара.'));
       }
       if (err.name === 'CastError') {
-        return res.status(400).send({ message: 'Пользователь по указанному id не найден' });
+        return next(new BadRequestError('Пользователь по указанному id не найден'));
       }
       if (err.name === 'Error') {
-        return res.status(404).send({ message: 'Нет пользователя по заданному id.' });
+        return next(new NotFoundError('Пользователь по указанному id не найден'));
       }
       return next(err);
     });
@@ -121,13 +130,5 @@ module.exports.login = (req, res, next) => {
       })
         .end();
     })
-    .catch((err) => {
-      if (err.name === 'MongoError' && err.code === 11000) {
-        return res.status(409).send({ message: 'Такой Email уже существует.' });
-      }
-      if (err.name === 'Error') {
-        return res.status(401).send({ message: 'Некорректный токен.' });
-      }
-      return next(err);
-    });
+    .catch(next);
 };
